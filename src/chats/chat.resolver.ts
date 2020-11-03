@@ -5,6 +5,8 @@ import { CreateMessageDto } from './dto/create-messages.dto';
 import { ResponseMessages } from './dto/messages.dto';
 import { PubSub } from 'graphql-subscriptions'
 import { ResponseUser } from './dto/user.dto';
+import { ResponseJoinedRoom } from './dto/response-joined-room';
+import { ResponseRoom } from './dto/room.dto';
 
 const pubSub = new PubSub();
 
@@ -15,44 +17,41 @@ export class ChatResolver {
     ) { }
 
     @Mutation(() => ResponseMessages)
-    sendMessage(
+    async sendMessage(
         @Args('message') message: CreateMessageDto
     ) {
-        const messageAdded = this.chatService.createMessage(message);
+        const messageAdded = await this.chatService.createMessage(message);
         pubSub.publish('messageAdded', { messageAdded });
         return messageAdded;
     }
-
-    // @Query(() => [ResponseMessages])
-    // getMessages() {
-    //     return this.chatService.getAllMessages();
-    // }
-
     
     @Query(() => [ResponseMessages])
     getMessagesInRoom(
         @Args('roomName') roomName: string,
-        @Args('page') page: number
     ) {
-        return this.chatService.getMessagesInRoom(roomName, page);
+        return this.chatService.getMessagesInRoom(roomName);
     }
 
-    @Query(() => ResponseUser)
-    joinedRoom(
+    @Mutation(() => ResponseUser)
+    async joinedRoom(
         @Args('nickName') nickName: string,
         @Args('roomName') roomName: string
     ) {
-        const user = this.chatService.joinedRoom(nickName, roomName);
-        pubSub.publish('userJoinedRoom', { user });
+        const user = await this.chatService.joinedRoom(nickName, roomName);
+        const userJoinedRoom =  { nickName : nickName, roomName: roomName };
+        pubSub.publish('userJoinedRoom', { userJoinedRoom });
         return user
     }
         
-    @Query(() => ResponseUser)
-    leaveRoom(
+    @Mutation(() => ResponseUser)
+    async leaveRoom(
         @Args('nickName') nickName: string,
         @Args('roomName') roomName: string
     ) {
-        return this.chatService.leaveRoom(nickName, roomName);
+        const user = await this.chatService.leaveRoom(nickName, roomName);
+        const userLeaveRoom =  { nickName : nickName, roomName: roomName };
+        pubSub.publish('userLeaveRoom', { userLeaveRoom });
+        return user;
     }
 
     @Mutation(() => ResponseUser)
@@ -62,13 +61,23 @@ export class ChatResolver {
         return this.chatService.createUser(nickName);
     }
 
+    @Query(() => [ResponseRoom])
+    getAllRooms() {
+        return this.chatService.getAllRooms();
+    }
+
     @Subscription(() => ResponseMessages)
     messageAdded() {
       return pubSub.asyncIterator('messageAdded');
     }
 
-    @Subscription(() => ResponseUser)
+    @Subscription(() => ResponseJoinedRoom)
     userJoinedRoom() {
       return pubSub.asyncIterator('userJoinedRoom');
+    }
+
+    @Subscription(() => ResponseJoinedRoom)
+    userLeaveRoom() {
+      return pubSub.asyncIterator('userLeaveRoom');
     }
 }

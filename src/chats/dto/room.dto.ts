@@ -1,5 +1,4 @@
 import { Field, ObjectType } from "@nestjs/graphql";
-import { ResponseMessages } from "./messages.dto";
 
 
 @ObjectType()
@@ -26,4 +25,7 @@ export class ResponseRoom {
         nullable: true
     })
     messages: Message[]
+
+    @Field()
+    name: string
 }

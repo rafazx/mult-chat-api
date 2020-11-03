@@ -2,8 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateMessageDto } from './dto/create-messages.dto';
+import { Messages } from './interfaces/IMessages';
+import { User } from './interfaces/IUser';
 import { MessagesDocument } from './models/messages.model';
-import { RoomsDocument } from './models/room.model';
+import { Rooms, RoomsDocument } from './models/room.model';
 import { UsersDocument } from './models/user.model';
 
 @Injectable()
@@ -14,7 +16,7 @@ export class ChatService {
         @InjectModel('Users') private readonly usersModel: Model<UsersDocument>
     ) {}
 
-    async createMessage(message: CreateMessageDto): Promise<any> {
+    async createMessage(message: CreateMessageDto): Promise<Messages> {
         const room = await this.roomsModel.findOne({name: message.roomName});
         if(!room) {
             throw new BadRequestException('Não existe Sala com esse Nome');
@@ -28,24 +30,18 @@ export class ChatService {
         return createdMessage
     }
 
-    // async getAllMessages(): Promise<any[]> {
-    //     return await this.messagesModel.find().sort({createdAt: 1});
-    // }
-
-    async getMessagesInRoom(roomName: string, page: number): Promise<any[]> {
+    async getMessagesInRoom(roomName: string): Promise<Messages[]> {
         const messages = await this.messagesModel.find({roomName})
-        .skip(page === 0 ? 0 : 2 * page)
-        .limit(2)
         .sort({createdAt : 1})
         return messages
     }
 
-    async createUser(nickName: string): Promise<any> {
+    async createUser(nickName: string): Promise<User> {
         const userExist = await this.usersModel.findOne({
             nickName
         });
         if(userExist) {
-            throw new BadRequestException('NickName já está sendo utilziado');
+            return userExist
         }
         const user = await this.usersModel.create({
             nickName
@@ -54,28 +50,31 @@ export class ChatService {
     }
 
     
-    async joinedRoom(nickName: string, roomName: string): Promise<any> {
+    async joinedRoom(nickName: string, roomName: string): Promise<User> {
         const user = await this.usersModel.findOne({
             nickName
         });
-        console.log(user)
         if(!user) {
             throw new BadRequestException('Usuário não existe');
-        }
+        };
         const room = await this.roomsModel.updateOne({
             name: roomName
         }, {
             $push: {
                 users: user
             }
-        })
+        });
         if(room.nModified != 1) {
             throw new Error('Error ao inserir Usuário na sala');
         }
-        return user
+        return user;
     }
 
-    async leaveRoom(nickName: string, roomName: string): Promise<any> {
+    async getAllRooms(): Promise<Rooms[]> {
+        return await this.roomsModel.find();
+    }
+
+    async leaveRoom(nickName: string, roomName: string): Promise<User> {
         const user = await this.usersModel.findOne({
             nickName
         });
@@ -83,6 +82,9 @@ export class ChatService {
             throw new BadRequestException('Usuário não existe');
         }
         const room = await this.roomsModel.findOne({name: roomName});
+        if(!room) {
+            throw new BadRequestException('Sala não existe');
+        }
         let i;
         room.users.filter((e, index) => {
             if(e.nickName === nickName) {
@@ -91,6 +93,6 @@ export class ChatService {
         });
         delete room.users[i];
         await room.save();
-        return room
+        return user;
     }
 }
